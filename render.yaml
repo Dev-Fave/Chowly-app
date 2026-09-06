@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chowly-app
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /db-test
+    envVars:
+      - key: DATABASE_URL
+        sync: false
