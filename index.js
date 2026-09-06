@@ -35,6 +35,7 @@ try {
 const { customer_id, restaurant_id, items } = req.body;
 
 let totalWaitTime = 0;
+let totalAmount = 0;
 let orderDetails = [];
 
 for (const item of items) {
@@ -42,6 +43,7 @@ const menuItem = await pool.query('SELECT * FROM menu_item WHERE id = $1', [item
 const row = menuItem.rows[0];
 const prepMinutes = parseInt(row.prep_time);
 if (prepMinutes > totalWaitTime) totalWaitTime = prepMinutes;
+totalAmount += Number(row.price) * item.quantity;
 orderDetails.push(`${item.quantity}x ${row.item_name}`);
 }
 
@@ -60,7 +62,7 @@ await pool.query(
 );
 }
 
-res.json({ order_id: orderId, waiting_time: `${totalWaitTime} mins`, details: orderDetails.join(', ') });
+res.json({ order_id: orderId, waiting_time: `${totalWaitTime} mins`, details: orderDetails.join(', '), total: totalAmount });
 } catch (err) {
 res.status(500).send('Error placing order: ' + err.message);
 }
@@ -69,7 +71,12 @@ res.status(500).send('Error placing order: ' + err.message);
 
 app.get('/api/orders', async (req, res) => {
 try {
-const result = await pool.query(`SELECT * FROM "order" ORDER BY order_date DESC`);
+const result = await pool.query(`
+SELECT "order".*, waiter.name AS waiter_name
+FROM "order"
+LEFT JOIN waiter ON waiter.id = "order".waiter_id
+ORDER BY order_date DESC
+`);
 res.json(result.rows);
 } catch (err) {
 res.status(500).send('Error fetching orders: ' + err.message);

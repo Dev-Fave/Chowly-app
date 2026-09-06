@@ -3,26 +3,59 @@
 <head>
 <title>Chowly</title>
 <style>
-body { font-family: Arial; max-width: 500px; margin: 40px auto; padding: 0 20px; }
-button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
-.item { border: 1px solid #ccc; padding: 10px; margin: 8px 0; border-radius: 6px; }
-#roleSwitch { margin-bottom: 20px; }
-input, select { padding: 8px; margin: 5px 0; }
+* { box-sizing: border-box; }
+body { font-family: "Trebuchet MS", sans-serif; max-width: 780px; margin: 0 auto; padding: 42px 24px 56px; color: #26352f; background: linear-gradient(135deg, #f7f1e7 0%, #eef5ef 100%); }
+.brand { margin-bottom: 30px; }
+.brand h1 { margin: 0; color: #173f35; font-family: Georgia, serif; font-size: clamp(2.4rem, 8vw, 4.4rem); line-height: 0.95; letter-spacing: 0; }
+.brand p:last-child { max-width: 360px; margin: 12px 0 0; color: #63736b; font-size: 1.05rem; }
+.eyebrow { margin: 0 0 10px; color: #bb633a; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; }
+h2, h3 { margin-top: 0; color: #173f35; font-family: Georgia, serif; }
+h2 { font-size: 2rem; margin-bottom: 18px; }
+h3 { font-size: 1.35rem; margin-bottom: 12px; }
+button { border: 0; border-radius: 7px; padding: 11px 16px; margin: 5px 0; color: #fff; background: #bb633a; cursor: pointer; font: inherit; font-weight: 700; transition: background 0.2s, box-shadow 0.2s, transform 0.2s; }
+button:hover { background: #9e4f2d; box-shadow: 0 5px 12px rgba(100, 55, 35, 0.18); transform: translateY(-1px); }
+button:disabled { opacity: 0.65; cursor: wait; transform: none; }
+.item, .panel { border: 1px solid #e1d9ca; padding: 16px; margin: 10px 0; border-radius: 10px; background: rgba(255, 253, 248, 0.9); box-shadow: 0 5px 18px rgba(46, 68, 55, 0.07); }
+#roleSwitch { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid rgba(38, 53, 47, 0.15); }
+#roleSwitch button { margin: 0; background: #173f35; }
+#roleSwitch button:hover { background: #0e3028; }
+#customerView, #waiterView { animation: appear 0.25s ease-out; }
+#customerView > h2, #waiterView > h2 { border-left: 5px solid #bb633a; padding-left: 13px; }
+#menuList { margin-bottom: 28px; }
+#menuList .item { min-height: 66px; }
+#cart:empty::before { content: 'Your cart is empty.'; color: #71808a; }
+#cartTotal { color: #173f35; font-size: 1.1rem; font-weight: 700; text-align: right; margin: 14px 0; }
+#menuList .item, #cart .item { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#menuList button, #cart button { flex: 0 0 auto; margin: 0; }
+#cart { padding: 4px 0; }
+#placeOrderButton { width: 100%; padding: 14px; font-size: 1rem; }
+#postOrderActions { margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(38, 53, 47, 0.15); }
+#orderResult, #actionResult { min-height: 24px; margin: 10px 0; }
+input, select { width: 100%; max-width: 420px; border: 1px solid #cfc5b4; border-radius: 7px; padding: 11px; margin: 5px 0; background: #fffdf8; color: inherit; font: inherit; }
+input:focus, select:focus { outline: 3px solid rgba(187, 99, 58, 0.2); border-color: #bb633a; }
+@keyframes appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 480px) { body { padding: 28px 14px 40px; } button { width: 100%; } #roleSwitch button { width: auto; flex: 1 1 140px; } #menuList .item, #cart .item { align-items: flex-start; } }
 </style>
 </head>
 <body>
+
+<header class="brand">
+<p class="eyebrow">GOOD FOOD, SIMPLIFIED</p>
+<h1>Chowly</h1>
+<p>Choose your favourites and send them straight to the kitchen.</p>
+</header>
 
 <div id="roleSwitch">
 <button onclick="showCustomer()">I'm a Customer</button>
 <button onclick="showWaiter()">I'm a Waiter</button>
 </div>
-
 <div id="customerView" style="display:none;">
 <h2>Menu</h2>
 <div id="menuList"></div>
 <h3>Your Order</h3>
 <div id="cart"></div>
-<button onclick="placeOrder()">Place Order</button>
+<div id="cartTotal">Total: ₦0</div>
+<button id="placeOrderButton" onclick="placeOrder()">Place Order</button>
 <div id="orderResult"></div>
 
 <div id="postOrderActions" style="display:none;">
@@ -52,6 +85,7 @@ input, select { padding: 8px; margin: 5px 0; }
 <script>
 let cart = [];
 let currentOrderId = null;
+let currentOrderTotal = 0;
 
 function showCustomer() {
 document.getElementById('customerView').style.display = 'block';
@@ -69,45 +103,69 @@ async function loadMenu() {
 const res = await fetch('/api/menu');
 const items = await res.json();
 document.getElementById('menuList').innerHTML = items.map(item =>
-`<div class="item">${item.item_name} - ₦${item.price} (${item.prep_time})
-<button onclick="addToCart(${item.id}, '${item.item_name}')">Add</button>
+`<div class="item"><span>${item.item_name} - ₦${Number(item.price).toLocaleString()} (${item.prep_time})</span>
+<button onclick="addToCart(${item.id}, '${item.item_name}', ${item.price})">Add</button>
 </div>`
 ).join('');
 }
 
-function addToCart(id, name) {
+function addToCart(id, name, price) {
 const existing = cart.find(c => c.menu_item_id === id);
 if (existing) {
 existing.quantity += 1;
 } else {
-cart.push({ menu_item_id: id, quantity: 1, name });
+cart.push({ menu_item_id: id, quantity: 1, name, price: Number(price) });
 }
 renderCart();
 }
 
 function renderCart() {
 document.getElementById('cart').innerHTML = cart.map(c =>
-`<div class="item">${c.quantity}x ${c.name}</div>`
+`<div class="item"><span>${c.quantity}x ${c.name} - ₦${(c.quantity * c.price).toLocaleString()}</span>
+<button onclick="removeFromCart(${c.menu_item_id})">Remove</button></div>`
 ).join('');
+const total = cart.reduce((sum, item) => sum + item.quantity * item.price, 0);
+document.getElementById('cartTotal').textContent = `Total: ₦${total.toLocaleString()}`;
+}
+
+function removeFromCart(id) {
+const item = cart.find(c => c.menu_item_id === id);
+if (!item) return;
+item.quantity -= 1;
+if (item.quantity === 0) cart = cart.filter(c => c.menu_item_id !== id);
+renderCart();
 }
 
 async function placeOrder() {
 if (cart.length === 0) {
-alert('Add at least one item first');
+document.getElementById('orderResult').innerHTML = '<p>Please add at least one item first.</p>';
 return;
 }
+const orderButton = document.getElementById('placeOrderButton');
+orderButton.disabled = true;
+orderButton.textContent = 'Placing order...';
+document.getElementById('orderResult').innerHTML = '<p>Sending your order...</p>';
+try {
 const res = await fetch('/api/orders', {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ customer_id: 1, restaurant_id: 1, items: cart })
 });
 const data = await res.json();
+if (!res.ok) throw new Error(data.error || data.message || 'Unable to place order');
 currentOrderId = data.order_id;
+currentOrderTotal = Number(data.total);
 document.getElementById('orderResult').innerHTML =
-`<p><b>Order placed!</b> Order #${data.order_id} - Waiting time: ${data.waiting_time}</p>`;
+`<p><b>Order placed!</b> Order #${data.order_id} - Total: ₦${currentOrderTotal.toLocaleString()} - Waiting time: ${data.waiting_time}</p>`;
 document.getElementById('postOrderActions').style.display = 'block';
 cart = [];
 renderCart();
+} catch (error) {
+document.getElementById('orderResult').innerHTML = `<p>We could not place your order: ${error.message}</p>`;
+} finally {
+orderButton.disabled = false;
+orderButton.textContent = 'Place Order';
+}
 }
 
 async function submitComplaint() {
@@ -136,7 +194,7 @@ async function payNow() {
 const res = await fetch(`/api/orders/${currentOrderId}/payment`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ method: 'card', amount: 7000 })
+body: JSON.stringify({ method: 'card', amount: currentOrderTotal })
 });
 const data = await res.json();
 document.getElementById('actionResult').innerHTML = `<p><b>${data.message}</b> (pretend payment) - ₦${data.amount}</p>`;
@@ -147,7 +205,8 @@ const res = await fetch('/api/orders');
 const orders = await res.json();
 document.getElementById('orderList').innerHTML = orders.map(order =>
 `<div class="item">
-Order #${order.id} - Status: ${order.status} - ${order.details}
+<b>Order #${order.id}</b> - Status: ${order.status}<br>${order.details}<br>
+Waiter: ${order.waiter_name || 'Not assigned'}
 ${order.status === 'Pending' ? `<br><button onclick="assignOrder(${order.id})">Assign & Mark Served</button>` : ''}
 </div>`
 ).join('');
