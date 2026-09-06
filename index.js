@@ -19,9 +19,10 @@ res.send('Database connection failed: ' + err.message);
 app.get('/api/menu', async (req, res) => {
 try {
 const result = await pool.query(`
-SELECT id, item_name, category, price, prep_time, availability
+SELECT DISTINCT ON (item_name, category) id, item_name, category, price, prep_time, availability
 FROM menu_item
 WHERE availability = 'available'
+ORDER BY item_name, category, id
 `);
 res.json(result.rows);
 } catch (err) {
