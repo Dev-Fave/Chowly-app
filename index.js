@@ -1,12 +1,9 @@
 const express = require('express');
 const app = express();
 app.use(express.static("public"));
-const PORT = 5000; 
+const PORT = process.env.PORT || 5000;
 const pool = require('./db');
 
-app.get('/', (req, res) => {
-res.send('Chowly is alive!');
-});
 app.get('/db-test', async (req, res) => {
 try {
 const result = await pool.query('SELECT NOW()');
