@@ -92,8 +92,22 @@ async function loadOrders() {
 const res = await fetch('/api/orders');
 const orders = await res.json();
 document.getElementById('orderList').innerHTML = orders.map(order =>
-`<div class="item">Order #${order.id} - Status: ${order.status} - ${order.details}</div>`
+`<div class="item">
+Order #${order.id} - Status: ${order.status} - ${order.details}
+${order.status === 'Pending' ? `<br><button onclick="assignOrder(${order.id})">Assign & Mark Served</button>` : ''}
+</div>`
 ).join('');
+}
+
+async function assignOrder(orderId) {
+const res = await fetch(`/api/orders/${orderId}/assign`, {
+method: 'PATCH',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ waiter_id: 1, chef_id: 1, bartender_id: 1 })
+});
+const data = await res.json();
+alert(data.message);
+loadOrders();
 }
 </script>
 
