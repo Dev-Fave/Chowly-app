@@ -19,6 +19,10 @@ button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
 <div id="customerView" style="display:none;">
 <h2>Menu</h2>
 <div id="menuList"></div>
+<h3>Your Order</h3>
+<div id="cart"></div>
+<button onclick="placeOrder()">Place Order</button>
+<div id="orderResult"></div>
 </div>
 
 <div id="waiterView" style="display:none;">
@@ -27,6 +31,8 @@ button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
 </div>
 
 <script>
+let cart = [];
+
 function showCustomer() {
 document.getElementById('customerView').style.display = 'block';
 document.getElementById('waiterView').style.display = 'none';
@@ -43,8 +49,43 @@ async function loadMenu() {
 const res = await fetch('/api/menu');
 const items = await res.json();
 document.getElementById('menuList').innerHTML = items.map(item =>
-`<div class="item">${item.item_name} - ₦${item.price} (${item.prep_time})</div>`
+`<div class="item">${item.item_name} - ₦${item.price} (${item.prep_time})
+<button onclick="addToCart(${item.id}, '${item.item_name}')">Add</button>
+</div>`
 ).join('');
+}
+
+function addToCart(id, name) {
+const existing = cart.find(c => c.menu_item_id === id);
+if (existing) {
+existing.quantity += 1;
+} else {
+cart.push({ menu_item_id: id, quantity: 1, name });
+}
+renderCart();
+}
+
+function renderCart() {
+document.getElementById('cart').innerHTML = cart.map(c =>
+`<div class="item">${c.quantity}x ${c.name}</div>`
+).join('');
+}
+
+async function placeOrder() {
+if (cart.length === 0) {
+alert('Add at least one item first');
+return;
+}
+const res = await fetch('/api/orders', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ customer_id: 1, restaurant_id: 1, items: cart })
+});
+const data = await res.json();
+document.getElementById('orderResult').innerHTML =
+`<p><b>Order placed!</b> Order #${data.order_id} - Waiting time: ${data.waiting_time}</p>`;
+cart = [];
+renderCart();
 }
 
 async function loadOrders() {
