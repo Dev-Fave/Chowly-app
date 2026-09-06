@@ -90,6 +90,39 @@ res.json({ message: 'Order assigned and marked as served' });
 res.status(500).send('Error assigning order: ' + err.message);
 }
 });
+app.post('/api/orders/:id/complaint', async (req, res) => {
+try {
+const { id } = req.params;
+const { customer_id, complaint_text } = req.body;
+
+await pool.query(
+`INSERT INTO complaint (order_id, customer_id, complaint_text) VALUES ($1, $2, $3)`,
+[id, customer_id, complaint_text]
+);
+
+res.json({ message: 'Complaint submitted successfully' });
+} catch (err) {
+res.status(500).send('Error submitting complaint: ' + err.message);
+}
+});
+
+app.post('/api/orders/:id/rating', async (req, res) => {
+try {
+const { id } = req.params;
+const { customer_id, rating_value } = req.body;
+
+await pool.query(
+`INSERT INTO rating (order_id, customer_id, rating_value) VALUES ($1, $2, $3)`,
+[id, customer_id, rating_value]
+);
+
+res.json({ message: 'Rating submitted successfully' });
+} catch (err) {
+res.status(500).send('Error submitting rating: ' + err.message);
+}
+});
+
+
 
 
 
