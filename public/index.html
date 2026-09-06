@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Chowly</title>
+<style>
+body { font-family: Arial; max-width: 500px; margin: 40px auto; padding: 0 20px; }
+button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
+.item { border: 1px solid #ccc; padding: 10px; margin: 8px 0; border-radius: 6px; }
+#roleSwitch { margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div id="roleSwitch">
+<button onclick="showCustomer()">I'm a Customer</button>
+<button onclick="showWaiter()">I'm a Waiter</button>
+</div>
+
+<div id="customerView" style="display:none;">
+<h2>Menu</h2>
+<div id="menuList"></div>
+</div>
+
+<div id="waiterView" style="display:none;">
+<h2>Orders</h2>
+<div id="orderList"></div>
+</div>
+
+<script>
+function showCustomer() {
+document.getElementById('customerView').style.display = 'block';
+document.getElementById('waiterView').style.display = 'none';
+loadMenu();
+}
+
+function showWaiter() {
+document.getElementById('waiterView').style.display = 'block';
+document.getElementById('customerView').style.display = 'none';
+loadOrders();
+}
+
+async function loadMenu() {
+const res = await fetch('/api/menu');
+const items = await res.json();
+document.getElementById('menuList').innerHTML = items.map(item =>
+`<div class="item">${item.item_name} - ₦${item.price} (${item.prep_time})</div>`
+).join('');
+}
+
+async function loadOrders() {
+const res = await fetch('/api/orders');
+const orders = await res.json();
+document.getElementById('orderList').innerHTML = orders.map(order =>
+`<div class="item">Order #${order.id} - Status: ${order.status} - ${order.details}</div>`
+).join('');
+}
+</script>
+
+</body>
+</html>
+

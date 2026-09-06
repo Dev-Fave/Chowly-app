@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+app.use(express.static("public"));
 const PORT = 5000; 
 const pool = require('./db');
 
