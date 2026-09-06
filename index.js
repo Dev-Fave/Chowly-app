@@ -123,6 +123,24 @@ res.status(500).send('Error submitting rating: ' + err.message);
 });
 
 
+app.post('/api/orders/:id/payment', async (req, res) => {
+try {
+const { id } = req.params;
+const { method, amount } = req.body;
+
+await pool.query(
+`INSERT INTO payment (order_id, method, status, amount, is_pretend) VALUES ($1, $2, 'Paid', $3, TRUE)`,
+[id, method, amount]
+);
+
+await pool.query(`UPDATE "order" SET status = 'Paid' WHERE id = $1`, [id]);
+
+res.json({ message: 'Payment recorded (pretend payment)', order_id: id, amount });
+} catch (err) {
+res.status(500).send('Error recording payment: ' + err.message);
+}
+});
+
 
 
 
