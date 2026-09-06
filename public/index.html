@@ -22,6 +22,9 @@ button:disabled { opacity: 0.65; cursor: wait; transform: none; }
 #customerView, #waiterView { animation: appear 0.25s ease-out; }
 #customerView > h2, #waiterView > h2 { border-left: 5px solid #bb633a; padding-left: 13px; }
 #menuList { margin-bottom: 28px; }
+#menuFilters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+#menuFilters button { padding: 8px 12px; margin: 0; background: #dce9df; color: #173f35; }
+#menuFilters button.active, #menuFilters button:hover { background: #173f35; color: #fff; }
 #menuList .item { min-height: 66px; }
 #cart:empty::before { content: 'Your cart is empty.'; color: #71808a; }
 #cartTotal { color: #173f35; font-size: 1.1rem; font-weight: 700; text-align: right; margin: 14px 0; }
@@ -30,6 +33,9 @@ button:disabled { opacity: 0.65; cursor: wait; transform: none; }
 #cart { padding: 4px 0; }
 #placeOrderButton { width: 100%; padding: 14px; font-size: 1rem; }
 #postOrderActions { margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(38, 53, 47, 0.15); }
+#orderTracking { margin-top: 24px; padding: 18px; border: 1px solid #c9ddd1; border-radius: 10px; background: #edf6ef; }
+#orderTracking h3 { margin-bottom: 8px; }
+#trackingResult { margin: 8px 0 0; }
 #orderResult, #actionResult { min-height: 24px; margin: 10px 0; }
 input, select { width: 100%; max-width: 420px; border: 1px solid #cfc5b4; border-radius: 7px; padding: 11px; margin: 5px 0; background: #fffdf8; color: inherit; font: inherit; }
 input:focus, select:focus { outline: 3px solid rgba(187, 99, 58, 0.2); border-color: #bb633a; }
@@ -51,12 +57,18 @@ input:focus, select:focus { outline: 3px solid rgba(187, 99, 58, 0.2); border-co
 </div>
 <div id="customerView" style="display:none;">
 <h2>Menu</h2>
+<div id="menuFilters"></div>
 <div id="menuList"></div>
 <h3>Your Order</h3>
 <div id="cart"></div>
 <div id="cartTotal">Total: ₦0</div>
 <button id="placeOrderButton" onclick="placeOrder()">Place Order</button>
 <div id="orderResult"></div>
+<div id="orderTracking" style="display:none;">
+<h3>Track your order</h3>
+<div id="trackingResult"></div>
+<button onclick="trackOrder()">Refresh Status</button>
+</div>
 
 <div id="postOrderActions" style="display:none;">
 <h3>After your meal</h3>
@@ -72,6 +84,11 @@ input:focus, select:focus { outline: 3px solid rgba(187, 99, 58, 0.2); border-co
 </select>
 <button onclick="submitRating()">Submit Rating</button>
 <br><br>
+<select id="paymentMethod">
+<option value="card">Card</option>
+<option value="cash">Cash</option>
+<option value="transfer">Bank Transfer</option>
+</select>
 <button onclick="payNow()">Pay Now (Pretend Payment)</button>
 <div id="actionResult"></div>
 </div>
@@ -84,8 +101,11 @@ input:focus, select:focus { outline: 3px solid rgba(187, 99, 58, 0.2); border-co
 
 <script>
 let cart = [];
+let menuItems = [];
 let currentOrderId = null;
 let currentOrderTotal = 0;
+let currentCustomerId = 1;
+let trackingTimer = null;
 
 function showCustomer() {
 document.getElementById('customerView').style.display = 'block';
@@ -100,9 +120,30 @@ loadOrders();
 }
 
 async function loadMenu() {
+	document.getElementById('menuList').innerHTML = '<div class="item">Loading menu...</div>';
+	try {
 const res = await fetch('/api/menu');
-const items = await res.json();
-document.getElementById('menuList').innerHTML = items.map(item =>
+	if (!res.ok) throw new Error('Menu is unavailable');
+menuItems = await res.json();
+const categories = ['all', ...new Set(menuItems.map(item => item.category).filter(Boolean))];
+document.getElementById('menuFilters').innerHTML = categories.map(category =>
+`<button class="${category === 'all' ? 'active' : ''}" onclick="filterMenu('${category}', this)">${category === 'all' ? 'All items' : category}</button>`
+).join('');
+renderMenu('all');
+} catch (error) {
+document.getElementById('menuList').innerHTML = `<div class="item">${error.message}.<br><button onclick="loadMenu()">Try Again</button></div>`;
+}
+}
+
+function filterMenu(category, button) {
+document.querySelectorAll('#menuFilters button').forEach(option => option.classList.remove('active'));
+button.classList.add('active');
+renderMenu(category);
+}
+
+function renderMenu(category) {
+const visibleItems = category === 'all' ? menuItems : menuItems.filter(item => item.category === category);
+document.getElementById('menuList').innerHTML = visibleItems.map(item =>
 `<div class="item"><span>${item.item_name} - ₦${Number(item.price).toLocaleString()} (${item.prep_time})</span>
 <button onclick="addToCart(${item.id}, '${item.item_name}', ${item.price})">Add</button>
 </div>`
@@ -155,9 +196,12 @@ const data = await res.json();
 if (!res.ok) throw new Error(data.error || data.message || 'Unable to place order');
 currentOrderId = data.order_id;
 currentOrderTotal = Number(data.total);
+currentCustomerId = data.customer_id;
 document.getElementById('orderResult').innerHTML =
 `<p><b>Order placed!</b> Order #${data.order_id} - Total: ₦${currentOrderTotal.toLocaleString()} - Waiting time: ${data.waiting_time}</p>`;
 document.getElementById('postOrderActions').style.display = 'block';
+	document.getElementById('orderTracking').style.display = 'block';
+	trackOrder();
 cart = [];
 renderCart();
 } catch (error) {
@@ -166,6 +210,20 @@ document.getElementById('orderResult').innerHTML = `<p>We could not place your o
 orderButton.disabled = false;
 orderButton.textContent = 'Place Order';
 }
+
+async function trackOrder() {
+	if (!currentOrderId) return;
+if (!trackingTimer) trackingTimer = setInterval(trackOrder, 10000);
+	try {
+		const res = await fetch(`/api/orders/${currentOrderId}`);
+		const order = await res.json();
+		if (!res.ok) throw new Error(order.error || 'Unable to load order status');
+		document.getElementById('trackingResult').innerHTML =
+		`<b>Order #${order.id}</b> is <strong>${order.status}</strong>.<br>Waiter: ${order.waiter_name || 'Waiting for assignment'}<br>Estimated wait: ${order.waiting_time || 'Being calculated'}`;
+	} catch (error) {
+		document.getElementById('trackingResult').textContent = error.message;
+	}
+}
 }
 
 async function submitComplaint() {
@@ -173,7 +231,7 @@ const text = document.getElementById('complaintText').value;
 const res = await fetch(`/api/orders/${currentOrderId}/complaint`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ customer_id: 1, complaint_text: text })
+body: JSON.stringify({ customer_id: currentCustomerId, complaint_text: text })
 });
 const data = await res.json();
 document.getElementById('actionResult').innerHTML = `<p>${data.message}</p>`;
@@ -184,20 +242,21 @@ const value = document.getElementById('ratingValue').value;
 const res = await fetch(`/api/orders/${currentOrderId}/rating`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ customer_id: 1, rating_value: value })
+body: JSON.stringify({ customer_id: currentCustomerId, rating_value: value })
 });
 const data = await res.json();
 document.getElementById('actionResult').innerHTML = `<p>${data.message}</p>`;
 }
 
 async function payNow() {
+const method = document.getElementById('paymentMethod').value;
 const res = await fetch(`/api/orders/${currentOrderId}/payment`, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ method: 'card', amount: currentOrderTotal })
+body: JSON.stringify({ method, amount: currentOrderTotal })
 });
 const data = await res.json();
-document.getElementById('actionResult').innerHTML = `<p><b>${data.message}</b> (pretend payment) - ₦${data.amount}</p>`;
+document.getElementById('actionResult').innerHTML = `<p><b>${data.message}</b> (${method}) - ₦${Number(data.amount).toLocaleString()}</p>`;
 }
 
 async function loadOrders() {

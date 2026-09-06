@@ -33,6 +33,15 @@ app.use(express.json());
 app.post('/api/orders', async (req, res) => {
 try {
 const { customer_id, restaurant_id, items } = req.body;
+let customerId = customer_id;
+
+const customerResult = await pool.query('SELECT id FROM customer WHERE id = $1', [customer_id]);
+if (customerResult.rows.length === 0) {
+const guestResult = await pool.query(
+`INSERT INTO customer (name, phone) VALUES ('Guest Customer', '0000000000') RETURNING id`
+);
+customerId = guestResult.rows[0].id;
+}
 
 let totalWaitTime = 0;
 let totalAmount = 0;
@@ -50,7 +59,7 @@ orderDetails.push(`${item.quantity}x ${row.item_name}`);
 const orderResult = await pool.query(
 `INSERT INTO "order" (customer_id, restaurant_id, waiting_time, details, status)
 VALUES ($1, $2, $3, $4, 'Pending') RETURNING id`,
-[customer_id, restaurant_id, `${totalWaitTime} mins`, orderDetails.join(', ')]
+[customerId, restaurant_id, `${totalWaitTime} mins`, orderDetails.join(', ')]
 );
 const orderId = orderResult.rows[0].id;
 
@@ -62,9 +71,9 @@ await pool.query(
 );
 }
 
-res.json({ order_id: orderId, waiting_time: `${totalWaitTime} mins`, details: orderDetails.join(', '), total: totalAmount });
+res.json({ order_id: orderId, customer_id: customerId, waiting_time: `${totalWaitTime} mins`, details: orderDetails.join(', '), total: totalAmount });
 } catch (err) {
-res.status(500).send('Error placing order: ' + err.message);
+res.status(500).json({ error: 'Error placing order: ' + err.message });
 }
 });
 
@@ -81,6 +90,21 @@ res.json(result.rows);
 } catch (err) {
 res.status(500).send('Error fetching orders: ' + err.message);
 }
+});
+
+app.get('/api/orders/:id', async (req, res) => {
+	try {
+		const result = await pool.query(`
+		SELECT "order".*, waiter.name AS waiter_name
+		FROM "order"
+		LEFT JOIN waiter ON waiter.id = "order".waiter_id
+		WHERE "order".id = $1
+		`, [req.params.id]);
+		if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
+		res.json(result.rows[0]);
+	} catch (err) {
+		res.status(500).json({ error: 'Error tracking order: ' + err.message });
+	}
 });
 
 app.patch('/api/orders/:id/assign', async (req, res) => {
