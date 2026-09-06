@@ -7,6 +7,7 @@ body { font-family: Arial; max-width: 500px; margin: 40px auto; padding: 0 20px;
 button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
 .item { border: 1px solid #ccc; padding: 10px; margin: 8px 0; border-radius: 6px; }
 #roleSwitch { margin-bottom: 20px; }
+input, select { padding: 8px; margin: 5px 0; }
 </style>
 </head>
 <body>
@@ -23,6 +24,24 @@ button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
 <div id="cart"></div>
 <button onclick="placeOrder()">Place Order</button>
 <div id="orderResult"></div>
+
+<div id="postOrderActions" style="display:none;">
+<h3>After your meal</h3>
+<input type="text" id="complaintText" placeholder="Complaint (optional)">
+<button onclick="submitComplaint()">Submit Complaint</button>
+<br><br>
+<select id="ratingValue">
+<option value="5">5 - Excellent</option>
+<option value="4">4 - Good</option>
+<option value="3">3 - Okay</option>
+<option value="2">2 - Poor</option>
+<option value="1">1 - Terrible</option>
+</select>
+<button onclick="submitRating()">Submit Rating</button>
+<br><br>
+<button onclick="payNow()">Pay Now (Pretend Payment)</button>
+<div id="actionResult"></div>
+</div>
 </div>
 
 <div id="waiterView" style="display:none;">
@@ -32,6 +51,7 @@ button { padding: 10px 16px; margin: 5px 0; cursor: pointer; }
 
 <script>
 let cart = [];
+let currentOrderId = null;
 
 function showCustomer() {
 document.getElementById('customerView').style.display = 'block';
@@ -82,10 +102,44 @@ headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ customer_id: 1, restaurant_id: 1, items: cart })
 });
 const data = await res.json();
+currentOrderId = data.order_id;
 document.getElementById('orderResult').innerHTML =
 `<p><b>Order placed!</b> Order #${data.order_id} - Waiting time: ${data.waiting_time}</p>`;
+document.getElementById('postOrderActions').style.display = 'block';
 cart = [];
 renderCart();
+}
+
+async function submitComplaint() {
+const text = document.getElementById('complaintText').value;
+const res = await fetch(`/api/orders/${currentOrderId}/complaint`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ customer_id: 1, complaint_text: text })
+});
+const data = await res.json();
+document.getElementById('actionResult').innerHTML = `<p>${data.message}</p>`;
+}
+
+async function submitRating() {
+const value = document.getElementById('ratingValue').value;
+const res = await fetch(`/api/orders/${currentOrderId}/rating`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ customer_id: 1, rating_value: value })
+});
+const data = await res.json();
+document.getElementById('actionResult').innerHTML = `<p>${data.message}</p>`;
+}
+
+async function payNow() {
+const res = await fetch(`/api/orders/${currentOrderId}/payment`, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ method: 'card', amount: 7000 })
+});
+const data = await res.json();
+document.getElementById('actionResult').innerHTML = `<p><b>${data.message}</b> (pretend payment) - ₦${data.amount}</p>`;
 }
 
 async function loadOrders() {
